@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="is">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eldsneytisvaktin — Live Fuel Prices in Iceland</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,500;9..40,700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0e1a; --bg2: #111827; --surface: rgba(15,23,42,0.5);
+    --border: rgba(148,163,184,0.06); --text: #e2e8f0; --muted: #64748b;
+    --dim: #334155; --green: #34d399; --blue: #38bdf8; --amber: #f59e0b;
+    --red: #f87171;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'DM Sans', 'Helvetica Neue', sans-serif;
+    background: linear-gradient(165deg, var(--bg), var(--bg2) 40%, #0f172a);
+    color: var(--text); min-height: 100vh;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .header {
+    background: linear-gradient(135deg, rgba(56,189,248,0.08), rgba(139,47,201,0.06));
+    border-bottom: 1px solid rgba(148,163,184,0.08);
+    padding: 28px 24px 22px;
+  }
+  .inner { max-width: 760px; margin: 0 auto; }
+  .logo-row { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }
+  .logo {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: linear-gradient(135deg, #38bdf8, #8b5cf6);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; color: #fff; box-shadow: 0 4px 16px rgba(56,189,248,0.25);
+  }
+  h1 {
+    font-size: 22px; font-weight: 700; letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #e2e8f0, #94a3b8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .subtitle { font-size: 11.5px; color: var(--muted); font-weight: 500; letter-spacing: 0.04em; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; align-items: center; }
+  .toggle-group {
+    display: inline-flex; background: rgba(15,23,42,0.6); border-radius: 10px;
+    border: 1px solid rgba(148,163,184,0.1); overflow: hidden;
+  }
+  .toggle-btn {
+    padding: 7px 16px; border: none; cursor: pointer; font-size: 13px;
+    font-weight: 600; font-family: inherit; transition: all 0.2s;
+    background: transparent; color: var(--muted);
+  }
+  .toggle-btn.active {
+    background: linear-gradient(135deg, rgba(56,189,248,0.2), rgba(139,92,246,0.15));
+    color: var(--text);
+  }
+  .toggle-btn:first-child { border-right: 1px solid rgba(148,163,184,0.08); }
+  .ctrl-btn {
+    padding: 7px 14px; border-radius: 10px; cursor: pointer; font-size: 13px;
+    font-weight: 600; font-family: inherit; transition: all 0.2s;
+    border: 1px solid rgba(148,163,184,0.1);
+    background: rgba(15,23,42,0.6); color: var(--muted);
+  }
+  .ctrl-btn.active { border-color: rgba(52,211,153,0.3); background: rgba(52,211,153,0.08); color: var(--green); }
+  .body { max-width: 760px; margin: 0 auto; padding: 22px 24px 48px; }
+
+  /* Summary cards */
+  .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 24px; }
+  .card {
+    padding: 16px 14px; border-radius: 14px; background: var(--surface);
+    border: 1px solid var(--border); position: relative; overflow: hidden;
+    animation: fadeUp 0.35s ease both;
+  }
+  .card .bar { position: absolute; top: 0; left: 0; right: 0; height: 2px; opacity: 0.6; }
+  .card-label { font-size: 10.5px; color: var(--muted); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 4px; }
+  .card-value { font-size: 24px; font-weight: 700; letter-spacing: -0.03em; }
+  .card-unit { font-size: 12px; font-weight: 500; color: #475569; margin-left: 3px; }
+
+  /* Brand rows */
+  .brands { display: flex; flex-direction: column; gap: 7px; }
+  .brand-row {
+    padding: 16px 18px; border-radius: 14px; position: relative; overflow: hidden;
+    background: rgba(15,23,42,0.4); border: 1px solid rgba(148,163,184,0.05);
+    animation: fadeUp 0.35s ease both;
+  }
+  .brand-row.lowest {
+    background: linear-gradient(135deg, rgba(52,211,153,0.06), rgba(52,211,153,0.02));
+    border-color: rgba(52,211,153,0.15);
+  }
+  .rank { position: absolute; top: 10px; right: 14px; font-size: 11px; font-weight: 700; color: var(--dim); }
+  .brand-inner { display: flex; align-items: center; gap: 12px; }
+  .brand-icon {
+    width: 42px; height: 42px; border-radius: 11px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12.5px; font-weight: 700;
+  }
+  .brand-content { flex: 1; min-width: 0; }
+  .brand-header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .brand-name { font-size: 14.5px; font-weight: 600; }
+  .brand-stations { font-size: 11px; color: #475569; margin-left: 7px; }
+  .brand-price { font-size: 21px; font-weight: 700; letter-spacing: -0.03em; }
+  .brand-price.lowest-price { color: var(--green); }
+  .price-unit { font-size: 11.5px; color: #475569; margin-left: 3px; }
+  .progress-track { margin-top: 8px; height: 4px; border-radius: 4px; background: rgba(148,163,184,0.06); position: relative; overflow: hidden; }
+  .progress-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; transition: width 0.6s ease; }
+  .discount-info { margin-top: 5px; font-size: 11px; color: #475569; }
+  .savings { color: var(--green); }
+
+  /* Tabs */
+  .view-tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
+  .view-tab {
+    padding: 10px 20px; cursor: pointer; font-size: 13px; font-weight: 600;
+    font-family: inherit; background: none; border: none; color: var(--muted);
+    border-bottom: 2px solid transparent; transition: all 0.2s;
+  }
+  .view-tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+  /* Chart */
+  .chart-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px; margin-bottom: 20px;
+  }
+  .chart-title { font-size: 14px; font-weight: 600; margin-bottom: 14px; }
+  .chart-range { display: flex; gap: 6px; margin-bottom: 14px; }
+  .range-btn {
+    padding: 5px 12px; border-radius: 8px; cursor: pointer; font-size: 12px;
+    font-weight: 600; font-family: inherit; border: 1px solid rgba(148,163,184,0.1);
+    background: rgba(15,23,42,0.6); color: var(--muted); transition: all 0.2s;
+  }
+  .range-btn.active { background: rgba(56,189,248,0.1); border-color: rgba(56,189,248,0.3); color: var(--blue); }
+
+  .footer {
+    margin-top: 24px; padding: 12px 0; border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;
+  }
+  .footer-text { font-size: 11px; color: var(--dim); }
+  .footer a { color: #475569; text-decoration: underline; }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  @media (max-width: 500px) {
+    .summary { grid-template-columns: 1fr; }
+    .card-value { font-size: 20px; }
+    .header, .body { padding-left: 16px; padding-right: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="inner">
+    <div class="logo-row">
+      <div class="logo">⛽</div>
+      <div>
+        <h1>Eldsneytisvaktin</h1>
+        <p class="subtitle">LIVE FUEL PRICES IN ICELAND</p>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="toggle-group">
+        <button class="toggle-btn active" data-fuel="bensin95">Bensín 95</button>
+        <button class="toggle-btn" data-fuel="diesel">Dísel</button>
+      </div>
+      <button class="ctrl-btn" id="discountBtn">Afsláttur</button>
+      <button class="ctrl-btn" id="sortBtn">↕ Verð</button>
+    </div>
+  </div>
+</div>
+
+<div class="body">
+  <div class="inner">
+    <!-- View tabs -->
+    <div class="view-tabs">
+      <button class="view-tab active" data-view="prices">Verð núna</button>
+      <button class="view-tab" data-view="history">Verðþróun</button>
+    </div>
+
+    <!-- Prices view -->
+    <div id="pricesView">
+      <div class="summary" id="summary"></div>
+      <div class="brands" id="brandList"></div>
+    </div>
+
+    <!-- History view -->
+    <div id="historyView" style="display:none">
+      <div class="chart-wrap">
+        <div class="chart-title">Verðþróun — lægsta verð hverrar keðju</div>
+        <div class="chart-range" id="rangeButtons"></div>
+        <canvas id="historyChart" height="300"></canvas>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span class="footer-text">
+        Gögn frá <a href="https://gasvaktin.is" target="_blank">gasvaktin.is</a> — uppfærist á 15 mín fresti
+      </span>
+      <span class="footer-text mono" id="lastUpdated"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+const BRAND_CONFIG = {
+  atlantsolia: { name: "Atlantsolía", color: "#D4940A", short: "AO" },
+  costco:      { name: "Costco",      color: "#E31837", short: "CO" },
+  n1:          { name: "N1",          color: "#00A550", short: "N1" },
+  ob:          { name: "ÓB",          color: "#FF6B00", short: "ÓB" },
+  olis:        { name: "Olís",        color: "#0055A4", short: "OL" },
+  orkan:       { name: "Orkan",       color: "#8B2FC9", short: "OR" },
+};
+
+let state = {
+  fuel: "bensin95",
+  discount: false,
+  sortBy: "price",
+  view: "prices",
+  range: "7d",
+  current: null,
+  history: [],
+  chart: null,
+};
+
+// ─── Data loading ───
+
+async function loadCurrent() {
+  try {
+    const res = await fetch("current.json?" + Date.now());
+    state.current = await res.json();
+  } catch (e) { console.error("Failed to load current.json", e); }
+}
+
+async function loadHistory() {
+  try {
+    const res = await fetch("history.csv?" + Date.now());
+    const text = await res.text();
+    const lines = text.trim().split("\n");
+    if (lines.length < 2) return;
+    const headers = lines[0].split(",");
+    state.history = lines.slice(1).map(line => {
+      const vals = line.split(",");
+      const row = {};
+      headers.forEach((h, i) => { row[h] = vals[i] || null; });
+      return row;
+    });
+  } catch (e) { console.error("Failed to load history.csv", e); }
+}
+
+// ─── Render: prices ───
+
+function getField() {
+  const base = state.fuel;
+  return state.discount ? base + "_discount" : base;
+}
+
+function renderPrices() {
+  if (!state.current) return;
+  const brands = state.current.brands;
+  const field = getField();
+
+  let items = Object.entries(brands).map(([key, data]) => ({
+    key, ...BRAND_CONFIG[key], ...data,
+    price: data[field],
+  })).filter(b => b.price != null);
+
+  if (state.sortBy === "price") {
+    items.sort((a, b) => a.price - b.price);
+  } else {
+    items.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  const lo = items.length ? items[0].price : 0;
+  const hi = items.length ? items[items.length - 1].price : 0;
+  const avg = items.length ? items.reduce((s, b) => s + b.price, 0) / items.length : 0;
+
+  // Summary
+  document.getElementById("summary").innerHTML = [
+    { label: "Lægsta", value: lo, accent: "var(--green)" },
+    { label: "Meðaltal", value: avg, accent: "var(--blue)" },
+    { label: "Hæsta", value: hi, accent: "var(--amber)" },
+  ].map((c, i) => `
+    <div class="card" style="animation-delay:${i * 0.07}s">
+      <div class="bar" style="background:${c.accent}"></div>
+      <div class="card-label">${c.label}</div>
+      <div class="card-value mono" style="color:${c.accent}">
+        ${c.value.toFixed(1)}<span class="card-unit">kr/l</span>
+      </div>
+    </div>
+  `).join("");
+
+  // Brand rows
+  const spread = hi - lo || 1;
+  document.getElementById("brandList").innerHTML = items.map((b, i) => {
+    const isLo = b.price === lo;
+    const barPct = ((b.price - lo) / spread) * 100;
+    const fullPrice = state.discount ? b[state.fuel] : null;
+    const saving = fullPrice && fullPrice !== b.price ? (fullPrice - b.price).toFixed(1) : null;
+
+    return `
+      <div class="brand-row ${isLo ? 'lowest' : ''}" style="animation-delay:${(i + 3) * 0.05}s">
+        ${state.sortBy === "price" ? `<div class="rank mono">#${i + 1}</div>` : ""}
+        <div class="brand-inner">
+          <div class="brand-icon mono" style="background:linear-gradient(135deg,${b.color}22,${b.color}08);border:1px solid ${b.color}30;color:${b.color}">${b.short}</div>
+          <div class="brand-content">
+            <div class="brand-header">
+              <div>
+                <span class="brand-name">${b.name}</span>
+                ${b.stations ? `<span class="brand-stations">${b.stations} stöðvar</span>` : ""}
+              </div>
+              <div>
+                <span class="brand-price mono ${isLo ? 'lowest-price' : ''}">${b.price.toFixed(1)}</span>
+                <span class="price-unit">kr/l</span>
+              </div>
+            </div>
+            <div class="progress-track">
+              <div class="progress-fill" style="width:${Math.max(4, 100 - barPct)}%;background:linear-gradient(90deg,${b.color}cc,${b.color}44)"></div>
+            </div>
+            ${state.discount && saving ? `<div class="discount-info">Fullt verð: ${fullPrice.toFixed(1)} — <span class="savings">sparnaður ${saving} kr/l</span></div>` : ""}
+            ${state.discount && !saving ? `<div class="discount-info" style="color:#3f4757">Enginn afsláttur í boði</div>` : ""}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  // Timestamp
+  if (state.current.timestamp) {
+    const d = new Date(state.current.timestamp);
+    document.getElementById("lastUpdated").textContent =
+      d.toLocaleDateString("is-IS") + " " + d.toLocaleTimeString("is-IS", { hour: "2-digit", minute: "2-digit" });
+  }
+}
+
+// ─── Render: history chart ───
+
+function renderHistory() {
+  const field = getField();
+  const brands = Object.keys(BRAND_CONFIG);
+
+  // Filter by range
+  const now = Date.now();
+  const ranges = { "24h": 1, "7d": 7, "30d": 30, "90d": 90, "all": 99999 };
+  const days = ranges[state.range] || 7;
+  const cutoff = now - days * 86400000;
+
+  const filtered = state.history.filter(row => {
+    const t = new Date(row.timestamp).getTime();
+    return t >= cutoff;
+  });
+
+  // Build datasets
+  const datasets = brands.map(brand => {
+    const cfg = BRAND_CONFIG[brand];
+    const col = `${brand}_${field}`;
+    const points = filtered
+      .filter(row => row[col] && row[col] !== "")
+      .map(row => ({ x: new Date(row.timestamp), y: parseFloat(row[col]) }));
+
+    return {
+      label: cfg.name,
+      data: points,
+      borderColor: cfg.color,
+      backgroundColor: cfg.color + "22",
+      borderWidth: 2,
+      pointRadius: 0,
+      pointHitRadius: 8,
+      tension: 0.3,
+    };
+  }).filter(ds => ds.data.length > 0);
+
+  const canvas = document.getElementById("historyChart");
+
+  if (state.chart) state.chart.destroy();
+
+  state.chart = new Chart(canvas, {
+    type: "line",
+    data: { datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      scales: {
+        x: {
+          type: "time",
+          time: { tooltipFormat: "d. MMM yyyy HH:mm" },
+          grid: { color: "rgba(148,163,184,0.06)" },
+          ticks: { color: "#475569", font: { size: 11 } },
+        },
+        y: {
+          grid: { color: "rgba(148,163,184,0.06)" },
+          ticks: {
+            color: "#475569",
+            font: { size: 11 },
+            callback: v => v + " kr",
+          },
+        },
+      },
+      plugins: {
+        legend: {
+          labels: { color: "#94a3b8", font: { size: 12 }, usePointStyle: true, pointStyle: "line" },
+        },
+        tooltip: {
+          backgroundColor: "#1e293b",
+          titleColor: "#e2e8f0",
+          bodyColor: "#94a3b8",
+          borderColor: "rgba(148,163,184,0.1)",
+          borderWidth: 1,
+          callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)} kr/l` },
+        },
+      },
+    },
+  });
+}
+
+// ─── Event handlers ───
+
+document.querySelectorAll(".toggle-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".toggle-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    state.fuel = btn.dataset.fuel;
+    render();
+  });
+});
+
+document.getElementById("discountBtn").addEventListener("click", () => {
+  state.discount = !state.discount;
+  document.getElementById("discountBtn").classList.toggle("active", state.discount);
+  document.getElementById("discountBtn").textContent = state.discount ? "✓ Afsláttur" : "Afsláttur";
+  render();
+});
+
+document.getElementById("sortBtn").addEventListener("click", () => {
+  state.sortBy = state.sortBy === "price" ? "name" : "price";
+  document.getElementById("sortBtn").textContent = "↕ " + (state.sortBy === "price" ? "Verð" : "Nafn");
+  render();
+});
+
+document.querySelectorAll(".view-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".view-tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    state.view = tab.dataset.view;
+    document.getElementById("pricesView").style.display = state.view === "prices" ? "" : "none";
+    document.getElementById("historyView").style.display = state.view === "history" ? "" : "none";
+    render();
+  });
+});
+
+function setupRangeButtons() {
+  const ranges = [["24h", "24klst"], ["7d", "7 dagar"], ["30d", "30 dagar"], ["90d", "90 dagar"], ["all", "Allt"]];
+  document.getElementById("rangeButtons").innerHTML = ranges.map(([k, l]) =>
+    `<button class="range-btn ${k === state.range ? 'active' : ''}" data-range="${k}">${l}</button>`
+  ).join("");
+  document.querySelectorAll(".range-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".range-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      state.range = btn.dataset.range;
+      renderHistory();
+    });
+  });
+}
+
+function render() {
+  if (state.view === "prices") renderPrices();
+  else renderHistory();
+}
+
+// ─── Init ───
+
+(async () => {
+  await Promise.all([loadCurrent(), loadHistory()]);
+  setupRangeButtons();
+  render();
+})();
+</script>
+</body>
+</html>
