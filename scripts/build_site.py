@@ -217,7 +217,7 @@ def build_html():
       <div class="chart-wrap">
         <div class="chart-title">Verðþróun — lægsta verð hverrar keðju</div>
         <div class="chart-range" id="rangeButtons"></div>
-        <canvas id="historyChart" height="300"></canvas>
+        <div style="position:relative;height:350px"><canvas id="historyChart"></canvas></div>
       </div>
     </div>
 
