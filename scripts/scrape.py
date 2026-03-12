@@ -18,12 +18,12 @@ CURRENT_FILE = os.path.join(DATA_DIR, "current.json")
 
 # Brand prefixes → brand key mapping
 BRAND_PREFIXES = {
-    "atlantsolia_": "atlantsolia",
-    "costco_": "costco",
+    "ao_": "atlantsolia",
+    "co_": "costco",
     "n1_": "n1",
     "ob_": "ob",
-    "olis_": "olis",
-    "orkan_": "orkan",
+    "ol_": "olis",
+    "or_": "orkan",
 }
 
 BRAND_NAMES = {
