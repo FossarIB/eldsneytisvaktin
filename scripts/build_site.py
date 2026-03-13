@@ -137,6 +137,32 @@ def build_html():
   .discount-info { margin-top: 5px; font-size: 11px; color: #475569; }
   .savings { color: var(--green); }
 
+  /* Stats view */
+  .stats-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 20px; }
+  .stats-controls label { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: 0.04em; }
+  .stats-controls input[type="date"] {
+    padding: 7px 12px; border-radius: 8px; border: 1px solid rgba(148,163,184,0.15);
+    background: rgba(15,23,42,0.7); color: var(--text); font-family: inherit; font-size: 13px;
+  }
+  .stats-controls input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); }
+  .stats-presets { display: flex; gap: 6px; margin-left: auto; }
+  .stats-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  .stats-table th {
+    text-align: left; padding: 10px 14px; font-size: 11px; color: var(--muted);
+    font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  .stats-table th:not(:first-child) { text-align: right; }
+  .stats-table td { padding: 12px 14px; font-size: 14px; border-bottom: 1px solid var(--border); }
+  .stats-table td:not(:first-child) { text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+  .stats-table tr:last-child td { border-bottom: none; }
+  .stats-table .brand-cell { display: flex; align-items: center; gap: 10px; }
+  .stats-table .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .stats-overall {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    margin-bottom: 20px;
+  }
+
   /* Tabs */
   .view-tabs { display: flex; gap: 0; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
   .view-tab {
@@ -204,6 +230,7 @@ def build_html():
     <div class="view-tabs">
       <button class="view-tab active" data-view="prices">Verð núna</button>
       <button class="view-tab" data-view="history">Verðþróun</button>
+      <button class="view-tab" data-view="stats">Tölfræði</button>
     </div>
 
     <!-- Prices view -->
@@ -218,6 +245,38 @@ def build_html():
         <div class="chart-title">Verðþróun — lægsta verð hverrar keðju</div>
         <div class="chart-range" id="rangeButtons"></div>
         <div style="position:relative;height:350px"><canvas id="historyChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Stats view -->
+    <div id="statsView" style="display:none">
+      <div class="chart-wrap">
+        <div class="chart-title">Meðalverð yfir tímabil</div>
+        <div class="stats-controls">
+          <label>Frá</label>
+          <input type="date" id="statsFrom">
+          <label>Til</label>
+          <input type="date" id="statsTo">
+          <div class="stats-presets">
+            <button class="range-btn" data-stats-range="24h">24klst</button>
+            <button class="range-btn" data-stats-range="7d">7 dagar</button>
+            <button class="range-btn active" data-stats-range="30d">30 dagar</button>
+            <button class="range-btn" data-stats-range="all">Allt</button>
+          </div>
+        </div>
+        <div class="stats-overall" id="statsOverall"></div>
+        <table class="stats-table">
+          <thead>
+            <tr>
+              <th>Keðja</th>
+              <th>Meðalverð</th>
+              <th>Lægsta</th>
+              <th>Hæsta</th>
+              <th>Mælingar</th>
+            </tr>
+          </thead>
+          <tbody id="statsBody"></tbody>
+        </table>
       </div>
     </div>
 
@@ -378,7 +437,7 @@ function renderHistory() {
     return t >= cutoff;
   });
 
- // Build datasets — use dash patterns so overlapping lines stay visible
+  // Build datasets — use dash patterns so overlapping lines stay visible
   const dashes = [[], [6,3], [2,2], [8,4,2,4], [4,4], [1,3]];
   const widths = [2.5, 2.5, 2, 2, 2, 2];
   const datasets = brands.map((brand, idx) => {
@@ -476,6 +535,7 @@ document.querySelectorAll(".view-tab").forEach(tab => {
     state.view = tab.dataset.view;
     document.getElementById("pricesView").style.display = state.view === "prices" ? "" : "none";
     document.getElementById("historyView").style.display = state.view === "history" ? "" : "none";
+    document.getElementById("statsView").style.display = state.view === "stats" ? "" : "none";
     render();
   });
 });
@@ -497,7 +557,97 @@ function setupRangeButtons() {
 
 function render() {
   if (state.view === "prices") renderPrices();
-  else renderHistory();
+  else if (state.view === "history") renderHistory();
+  else if (state.view === "stats") renderStats();
+}
+
+// ─── Render: stats ───
+
+function renderStats() {
+  const field = getField();
+  const brands = Object.keys(BRAND_CONFIG);
+  const fromEl = document.getElementById("statsFrom");
+  const toEl = document.getElementById("statsTo");
+  const from = fromEl.value ? new Date(fromEl.value + "T00:00:00") : new Date(0);
+  const to = toEl.value ? new Date(toEl.value + "T23:59:59") : new Date();
+
+  const filtered = state.history.filter(row => {
+    const t = new Date(row.timestamp);
+    return t >= from && t <= to;
+  });
+
+  const brandStats = brands.map(brand => {
+    const cfg = BRAND_CONFIG[brand];
+    const col = `${brand}_${field}`;
+    const vals = filtered
+      .map(row => row[col] ? parseFloat(row[col]) : null)
+      .filter(v => v !== null && !isNaN(v));
+    if (vals.length === 0) return null;
+    const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    return { brand, name: cfg.name, color: cfg.color, short: cfg.short, avg, min, max, count: vals.length };
+  }).filter(Boolean).sort((a, b) => a.avg - b.avg);
+
+  if (brandStats.length === 0) {
+    document.getElementById("statsOverall").innerHTML = "";
+    document.getElementById("statsBody").innerHTML = '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:40px">Engin gögn á þessu tímabili</td></tr>';
+    return;
+  }
+
+  const allAvgs = brandStats.map(b => b.avg);
+  const overallAvg = allAvgs.reduce((s, v) => s + v, 0) / allAvgs.length;
+  const overallLo = Math.min(...allAvgs);
+  const overallHi = Math.max(...allAvgs);
+
+  document.getElementById("statsOverall").innerHTML = [
+    { label: "Lægsta meðaltal", value: overallLo, accent: "var(--green)" },
+    { label: "Heildarmeðaltal", value: overallAvg, accent: "var(--blue)" },
+    { label: "Hæsta meðaltal", value: overallHi, accent: "var(--amber)" },
+  ].map(c => `
+    <div class="card">
+      <div class="bar" style="background:${c.accent}"></div>
+      <div class="card-label">${c.label}</div>
+      <div class="card-value mono" style="color:${c.accent}">
+        ${c.value.toFixed(1)}<span class="card-unit">kr/l</span>
+      </div>
+    </div>
+  `).join("");
+
+  document.getElementById("statsBody").innerHTML = brandStats.map(b => `
+    <tr>
+      <td><div class="brand-cell"><span class="dot" style="background:${b.color}"></span>${b.name}</div></td>
+      <td>${b.avg.toFixed(1)}</td>
+      <td style="color:var(--green)">${b.min.toFixed(1)}</td>
+      <td style="color:var(--amber)">${b.max.toFixed(1)}</td>
+      <td style="color:var(--muted)">${b.count}</td>
+    </tr>
+  `).join("");
+}
+
+function setupStatsControls() {
+  // Set default date range (30 days)
+  const now = new Date();
+  const ago = new Date(now.getTime() - 30 * 86400000);
+  document.getElementById("statsTo").value = now.toISOString().split("T")[0];
+  document.getElementById("statsFrom").value = ago.toISOString().split("T")[0];
+
+  document.getElementById("statsFrom").addEventListener("change", () => { if (state.view === "stats") renderStats(); });
+  document.getElementById("statsTo").addEventListener("change", () => { if (state.view === "stats") renderStats(); });
+
+  document.querySelectorAll("[data-stats-range]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("[data-stats-range]").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const range = btn.dataset.statsRange;
+      const now = new Date();
+      const days = { "24h": 1, "7d": 7, "30d": 30, "all": 99999 }[range] || 30;
+      const from = days >= 99999 ? new Date(2020, 0, 1) : new Date(now.getTime() - days * 86400000);
+      document.getElementById("statsFrom").value = from.toISOString().split("T")[0];
+      document.getElementById("statsTo").value = now.toISOString().split("T")[0];
+      if (state.view === "stats") renderStats();
+    });
+  });
 }
 
 // ─── Init ───
@@ -505,6 +655,7 @@ function render() {
 (async () => {
   await Promise.all([loadCurrent(), loadHistory()]);
   setupRangeButtons();
+  setupStatsControls();
   render();
 })();
 </script>
