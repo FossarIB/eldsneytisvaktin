@@ -65,7 +65,10 @@ def _parse_float(val):
     if val is None or val == "":
         return None
     try:
-        return float(val)
+        v = float(val)
+        if v < 100:
+            return None  # Filter out obviously bad data
+        return v
     except ValueError:
         return None
 
