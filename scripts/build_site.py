@@ -378,8 +378,10 @@ function renderHistory() {
     return t >= cutoff;
   });
 
-  // Build datasets
-  const datasets = brands.map(brand => {
+ // Build datasets — use dash patterns so overlapping lines stay visible
+  const dashes = [[], [6,3], [2,2], [8,4,2,4], [4,4], [1,3]];
+  const widths = [2.5, 2.5, 2, 2, 2, 2];
+  const datasets = brands.map((brand, idx) => {
     const cfg = BRAND_CONFIG[brand];
     const col = `${brand}_${field}`;
     const points = filtered
@@ -391,8 +393,9 @@ function renderHistory() {
       data: points,
       borderColor: cfg.color,
       backgroundColor: cfg.color + "22",
-      borderWidth: 2,
-      pointRadius: 0,
+      borderWidth: widths[idx] || 2,
+      borderDash: dashes[idx] || [],
+      pointRadius: 2,
       pointHitRadius: 8,
       tension: 0.3,
     };
