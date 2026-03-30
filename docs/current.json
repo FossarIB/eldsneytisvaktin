@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-03-30T08:54:25Z",
+  "timestamp": "2026-03-30T10:15:14Z",
   "brands": {
     "atlantsolia": {
       "name": "Atlantsolía",
@@ -46,8 +46,8 @@
       "stations": 73,
       "bensin95": 209.0,
       "diesel": 243.0,
-      "bensin95_discount": 214.9,
-      "diesel_discount": 242.4
+      "bensin95_discount": 197.0,
+      "diesel_discount": 231.0
     }
   }
 }
