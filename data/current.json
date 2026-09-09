@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-09-09T11:06:02Z",
+  "timestamp": "2026-09-09T15:06:04Z",
   "brands": {
     "atlantsolia": {
       "name": "Atlantsolía",
@@ -28,18 +28,18 @@
     "ob": {
       "name": "ÓB",
       "stations": 47,
-      "bensin95": 230.7,
-      "diesel": 269.8,
-      "bensin95_discount": 238.5,
-      "diesel_discount": 271.0
+      "bensin95": 229.6,
+      "diesel": 268.7,
+      "bensin95_discount": 237.4,
+      "diesel_discount": 269.9
     },
     "olis": {
       "name": "Olís",
       "stations": 19,
       "bensin95": 252.7,
-      "diesel": 285.3,
+      "diesel": 286.3,
       "bensin95_discount": 242.7,
-      "diesel_discount": 275.3
+      "diesel_discount": 276.3
     },
     "orkan": {
       "name": "Orkan",
